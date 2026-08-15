@@ -4,7 +4,25 @@ from types import SimpleNamespace
 
 import pytest
 
-from r15tool.cli import build_parser, generate, main, run_benchmark
+from r15tool.cli import (
+    _configure_text_stream,
+    build_parser,
+    generate,
+    main,
+    run_benchmark,
+)
+
+
+def test_console_stream_is_configured_for_safe_utf8_output():
+    class FakeStream:
+        options = None
+
+        def reconfigure(self, **kwargs):
+            self.options = kwargs
+
+    stream = FakeStream()
+    _configure_text_stream(stream)
+    assert stream.options == {"encoding": "utf-8", "errors": "replace"}
 
 
 def test_explicit_report_generates_without_interactive_prompt(

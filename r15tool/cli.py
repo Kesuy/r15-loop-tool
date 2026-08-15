@@ -14,6 +14,12 @@ DEFAULT_OUTPUT = "R15曲线图.html"
 DEFAULT_EXE = "CINEBENCH Windows 64 Bit.exe"
 
 
+def _configure_text_stream(stream: object) -> None:
+    reconfigure = getattr(stream, "reconfigure", None)
+    if callable(reconfigure):
+        reconfigure(encoding="utf-8", errors="replace")
+
+
 def _same_file(first: Path, second: Path) -> bool:
     try:
         return first.samefile(second)
@@ -100,6 +106,8 @@ def _interactive_runs() -> int | None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_text_stream(sys.stdout)
+    _configure_text_stream(sys.stderr)
     args = build_parser().parse_args(argv)
     print("Cinebench R15 循环跑分工具")
     try:
