@@ -68,12 +68,41 @@ def render_report(scores: Iterable[float], output: str | Path) -> Path:
     count = len(values)
     labels = list(range(1, count + 1))
     show_labels = count <= 30
+    show_zoom = count > 60
     initial_end = min(100.0, 60 / count * 100)
     label_interval = max(0, math.ceil(min(count, 60) / 15) - 1)
+    data_zoom = (
+        [
+            {
+                "type": "inside",
+                "start": 0,
+                "end": initial_end,
+                "zoomOnMouseWheel": True,
+            },
+            {
+                "type": "slider",
+                "start": 0,
+                "end": initial_end,
+                "height": 24,
+                "bottom": 24,
+            },
+        ]
+        if show_zoom
+        else []
+    )
     option = {
         "animation": count <= 500,
-        "tooltip": {"trigger": "axis", "valueFormatter": "__FORMATTER__"},
-        "grid": {"left": 72, "right": 72, "top": 64, "bottom": 92},
+        "tooltip": {
+            "trigger": "axis",
+            "axisPointer": {"type": "line", "lineStyle": {"color": "#94a3b8"}},
+            "valueFormatter": "__FORMATTER__",
+        },
+        "grid": {
+            "left": 72,
+            "right": 96,
+            "top": 64,
+            "bottom": 92 if show_zoom else 58,
+        },
         "xAxis": {
             "type": "category",
             "name": "循环次数",
@@ -91,21 +120,7 @@ def render_report(scores: Iterable[float], output: str | Path) -> Path:
             "scale": True,
             "splitLine": {"lineStyle": {"color": "#e5e7eb"}},
         },
-        "dataZoom": [
-            {
-                "type": "inside",
-                "start": 0,
-                "end": initial_end,
-                "zoomOnMouseWheel": True,
-            },
-            {
-                "type": "slider",
-                "start": 0,
-                "end": initial_end,
-                "height": 24,
-                "bottom": 24,
-            },
-        ],
+        "dataZoom": data_zoom,
         "series": [
             {
                 "name": "R15 多核得分",
@@ -117,19 +132,72 @@ def render_report(scores: Iterable[float], output: str | Path) -> Path:
                 "lineStyle": {"width": 2, "color": "#2563eb"},
                 "itemStyle": {"color": "#2563eb"},
                 "areaStyle": {"color": "rgba(37, 99, 235, 0.08)"},
-                "label": {"show": show_labels, "position": "top", "formatter": "{c}"},
+                "label": {
+                    "show": show_labels,
+                    "position": "top",
+                    "distance": 8,
+                    "color": "#334155",
+                    "fontSize": 11,
+                    "backgroundColor": "rgba(255,255,255,.82)",
+                    "borderRadius": 3,
+                    "padding": [2, 4],
+                    "formatter": "{c}",
+                },
+                "labelLayout": {"hideOverlap": True},
                 "markPoint": {
+                    "symbol": "circle",
+                    "symbolSize": 16,
+                    "label": {"show": False},
+                    "tooltip": {"formatter": "{b}: {c} cb"},
                     "data": [
-                        {"type": "max", "name": "最大值"},
-                        {"type": "min", "name": "最小值"},
+                        {
+                            "type": "max",
+                            "name": "最高分",
+                            "itemStyle": {
+                                "color": "#16a34a",
+                                "borderColor": "#ffffff",
+                                "borderWidth": 3,
+                            },
+                        },
+                        {
+                            "type": "min",
+                            "name": "最低分",
+                            "itemStyle": {
+                                "color": "#dc2626",
+                                "borderColor": "#ffffff",
+                                "borderWidth": 3,
+                            },
+                        },
                     ]
                 },
-                "markLine": {"data": [{"type": "average", "name": "平均值"}]},
+                "markLine": {
+                    "symbol": ["none", "none"],
+                    "lineStyle": {"color": "#64748b", "type": "dashed"},
+                    "label": {
+                        "formatter": "平均 {c}",
+                        "color": "#475569",
+                        "backgroundColor": "rgba(255,255,255,.92)",
+                        "borderRadius": 4,
+                        "padding": [3, 6],
+                    },
+                    "data": [{"type": "average", "name": "平均值"}],
+                },
             }
         ],
     }
     option_json = json.dumps(option, ensure_ascii=False, separators=(",", ":"))
     option_json = option_json.replace('"__FORMATTER__"', "value => `${value} cb`")
+    hint = (
+        "可拖动底部滑块或使用鼠标滚轮缩放；双击图表可恢复全部数据。"
+        if show_zoom
+        else "将鼠标移到数据点可查看成绩；绿色为最高分，红色为最低分。"
+    )
+    average = mean(values)
+    table_rows = "".join(
+        f"<tr><td>{index}</td><td>{_display_number(value)} cb</td>"
+        f"<td>{value - average:+,.2f} cb</td></tr>"
+        for index, value in enumerate(values, start=1)
+    )
     html = f"""<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -151,7 +219,16 @@ h1 {{ margin: 0 0 18px; font-size: clamp(22px, 3vw, 34px); }}
 .chart-shell {{ width: 100%; padding: 10px; overflow: hidden; }}
 #chart {{ width: 100%; height: min(68vh, 640px); min-height: 420px; }}
 .hint {{ margin: 12px 4px 0; color: #667085; font-size: 13px; }}
+.raw-data {{ margin-top: 14px; padding: 12px 16px; background: #fff; border: 1px solid #e5eaf2; border-radius: 12px; }}
+.raw-data summary {{ cursor: pointer; color: #475569; font-weight: 600; }}
+.table-wrap {{ margin-top: 12px; max-height: 320px; overflow: auto; }}
+table {{ width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }}
+th, td {{ padding: 9px 12px; border-bottom: 1px solid #eef2f6; text-align: right; }}
+th:first-child, td:first-child {{ text-align: left; }}
+th {{ position: sticky; top: 0; background: #f8fafc; color: #475569; font-size: 13px; }}
+.chart-error {{ display: grid; place-items: center; padding: 32px; color: #b42318; text-align: center; }}
 @media (max-width: 700px) {{ .stats {{ grid-template-columns: repeat(2, 1fr); }} body {{ padding: 10px; }} #chart {{ min-height: 360px; }} }}
+@media print {{ body {{ padding: 0; background: #fff; }} .stat, .chart-shell, .raw-data {{ box-shadow: none; }} .hint {{ display: none; }} .table-wrap {{ max-height: none; overflow: visible; }} }}
 </style>
 </head>
 <body>
@@ -164,15 +241,27 @@ h1 {{ margin: 0 0 18px; font-size: clamp(22px, 3vw, 34px); }}
 <div class="stat"><span>平均分</span><strong>{_display_number(mean(values))} cb</strong></div>
 </section>
 <section class="chart-shell"><div id="chart" role="img" aria-label="R15 多核得分折线图"></div></section>
-<p class="hint">可拖动底部滑块或使用鼠标滚轮缩放；双击图表可恢复全部数据。</p>
+<p class="hint">{hint}</p>
+<details class="raw-data">
+<summary>查看详细成绩</summary>
+<div class="table-wrap"><table>
+<thead><tr><th>循环</th><th>得分</th><th>较平均分</th></tr></thead>
+<tbody>{table_rows}</tbody>
+</table></div>
+</details>
 </main>
 <script>
 const chartElement = document.getElementById("chart");
-const chart = echarts.init(chartElement, null, {{ renderer: "canvas" }});
-const option = {option_json};
-chart.setOption(option);
-new ResizeObserver(() => chart.resize()).observe(chartElement);
-chart.getZr().on("dblclick", () => chart.dispatchAction({{ type: "dataZoom", start: 0, end: 100 }}));
+if (typeof echarts === "undefined") {{
+  chartElement.className = "chart-error";
+  chartElement.textContent = "图表组件加载失败，请检查网络连接后刷新页面；详细成绩仍可在下方查看。";
+}} else {{
+  const chart = echarts.init(chartElement, null, {{ renderer: "canvas" }});
+  const option = {option_json};
+  chart.setOption(option);
+  new ResizeObserver(() => chart.resize()).observe(chartElement);
+  chart.getZr().on("dblclick", () => chart.dispatchAction({{ type: "dataZoom", start: 0, end: 100 }}));
+}}
 </script>
 </body>
 </html>
