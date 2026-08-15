@@ -60,12 +60,20 @@ def test_packaged_app_generates_and_opens_report_next_to_executable(
     monkeypatch.setattr("r15tool.cli.sys.frozen", True, raising=False)
     monkeypatch.setattr("r15tool.cli.sys.executable", str(app_dir / "R15-loop.exe"))
     monkeypatch.setattr("r15tool.cli.subprocess.run", fake_run)
-    monkeypatch.setattr("r15tool.cli.webbrowser.open", lambda uri: opened.append(uri))
+    if os.name == "nt":
+        monkeypatch.setattr(
+            "r15tool.cli.os.startfile",
+            lambda path: opened.append(Path(path).resolve()),
+            raising=False,
+        )
+    else:
+        monkeypatch.setattr("r15tool.cli.webbrowser.open", lambda uri: opened.append(uri))
 
     assert main(["--runs", "1"]) == 0
     output = app_dir / "R15曲线图.html"
     assert output.is_file()
-    assert opened == [output.resolve().as_uri()]
+    expected_opened = output.resolve() if os.name == "nt" else output.resolve().as_uri()
+    assert opened == [expected_opened]
 
 
 def test_runs_and_existing_report_are_mutually_exclusive():
