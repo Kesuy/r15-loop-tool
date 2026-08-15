@@ -74,11 +74,15 @@ def test_large_report_stays_responsive_and_uses_zoom(tmp_path: Path):
     assert '"type":"slider"' in html
     assert '"type":"inside"' in html
     assert '"show":false' in html
-    assert '"right":72' in html
+    assert '"right":96' in html
     assert '"interval":3' in html
     assert 'integrity="sha384-' in html
     assert "ResizeObserver" in html
     assert "250 次" in html
+    assert '"label":{"show":false}' in html
+    assert '"symbol":["none","none"]' in html
+    assert "查看详细成绩" in html
+    assert "图表组件加载失败" in html
     assert len(html) < 150_000
 
 
@@ -87,3 +91,6 @@ def test_short_report_shows_point_labels(tmp_path: Path):
     render_report([1200, 1210, 1220], output)
     html = output.read_text(encoding="utf-8")
     assert '"show":true' in html
+    assert '"type":"slider"' not in html
+    assert "绿色为最高分，红色为最低分" in html
+    assert "+0.00 cb" in html
