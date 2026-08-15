@@ -39,7 +39,7 @@ jobs:
       - name: Smoke test packaged EXE
         shell: pwsh
         run: |
-          $lines = 1..500 | ForEach-Object { "Rendering (Multiple CPU) $([1200 + ($_ % 41)]).00 cb" }
+          $lines = 1..500 | ForEach-Object { "Rendering (Multiple CPU) $(1200 + ($_ % 41)).00 cb" }
           [IO.File]::WriteAllLines("$PWD\R15benchmark.txt", $lines, [Text.UTF8Encoding]::new($false))
           & "$PWD\dist\R15循环工具.exe" --report "$PWD\R15benchmark.txt" --output "$PWD\R15曲线图.html" --no-open
           if ($LASTEXITCODE -ne 0) { throw "EXE exited with code $LASTEXITCODE" }
