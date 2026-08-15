@@ -92,6 +92,22 @@ def test_generate_reads_windows_report_encodings(tmp_path: Path, encoding: str):
     assert "1,234 cb" in output.read_text(encoding="utf-8")
 
 
+def test_generate_reads_real_cinebench_r15_pts_output(tmp_path: Path):
+    report = tmp_path / "R15benchmark.txt"
+    output = tmp_path / "R15曲线图.html"
+    report.write_text(
+        "CINEBENCH R15 Result\n\n"
+        "Rendering (Multiple CPU) : 4649.00 pts\n",
+        encoding="utf-8",
+    )
+
+    result = generate(report, output, open_browser=False)
+
+    assert result == output.resolve()
+    assert output.is_file()
+    assert "4,649 cb" in output.read_text(encoding="utf-8")
+
+
 def test_generate_opens_only_after_html_exists(tmp_path: Path, monkeypatch):
     report = tmp_path / "R15benchmark.txt"
     output = tmp_path / "R15曲线图.html"
