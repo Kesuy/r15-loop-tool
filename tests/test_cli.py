@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -33,6 +34,18 @@ def test_generate_refuses_to_overwrite_source_report(tmp_path: Path):
 
     with pytest.raises(ValueError, match="不能是同一个文件"):
         generate(report, report, open_browser=False)
+
+    assert report.read_text(encoding="utf-8").startswith("Rendering")
+
+
+def test_generate_refuses_hard_link_alias_of_source_report(tmp_path: Path):
+    report = tmp_path / "scores.txt"
+    output = tmp_path / "alias.html"
+    report.write_text("Rendering (Multiple CPU) 1234 cb\n", encoding="utf-8")
+    os.link(report, output)
+
+    with pytest.raises(ValueError, match="不能是同一个文件"):
+        generate(report, output, open_browser=False)
 
     assert report.read_text(encoding="utf-8").startswith("Rendering")
 
@@ -108,4 +121,25 @@ def test_main_rejects_benchmark_executable_as_html_output_before_running(
         )
         == 1
     )
+    assert executable.read_bytes() == b"original executable"
+
+
+@pytest.mark.parametrize("alias_role", ["report", "output"])
+def test_main_rejects_hard_link_alias_of_executable_before_running(
+    tmp_path: Path, monkeypatch, alias_role: str
+):
+    executable = tmp_path / "CINEBENCH Windows 64 Bit.exe"
+    executable.write_bytes(b"original executable")
+    alias = tmp_path / ("R15benchmark.txt" if alias_role == "report" else "alias.html")
+    os.link(executable, alias)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "r15tool.cli.subprocess.run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not run")),
+    )
+    arguments = ["--runs", "1", "--cinebench", str(executable), "--no-open"]
+    if alias_role == "output":
+        arguments.extend(["--output", str(alias)])
+
+    assert main(arguments) == 1
     assert executable.read_bytes() == b"original executable"

@@ -14,6 +14,13 @@ DEFAULT_OUTPUT = "R15曲线图.html"
 DEFAULT_EXE = "CINEBENCH Windows 64 Bit.exe"
 
 
+def _same_file(first: Path, second: Path) -> bool:
+    try:
+        return first.samefile(second)
+    except OSError:
+        return first.resolve() == second.resolve()
+
+
 def run_benchmark(executable: Path, report: Path, runs: int) -> None:
     if runs < 1:
         raise ValueError("循环次数必须大于 0")
@@ -37,7 +44,7 @@ def run_benchmark(executable: Path, report: Path, runs: int) -> None:
 
 
 def generate(report: Path, output: Path, *, open_browser: bool = True) -> Path:
-    if report.resolve() == output.resolve():
+    if _same_file(report, output):
         raise ValueError("跑分报告和 HTML 输出不能是同一个文件")
     scores = parse_scores(report.read_text(encoding="utf-8", errors="ignore"))
     result = render_report(scores, output)
@@ -104,11 +111,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.runs is not None or args.report is not None
             else _interactive_runs()
         )
-        if report == output:
+        if _same_file(report, output):
             raise ValueError("跑分报告和 HTML 输出不能是同一个文件")
-        if runs is not None and report == executable:
+        if runs is not None and _same_file(report, executable):
             raise ValueError("Cinebench 可执行文件和跑分报告不能是同一个文件")
-        if runs is not None and output == executable:
+        if runs is not None and _same_file(output, executable):
             raise ValueError("Cinebench 可执行文件和 HTML 输出不能是同一个文件")
         if runs is not None:
             run_benchmark(executable, report, runs)
