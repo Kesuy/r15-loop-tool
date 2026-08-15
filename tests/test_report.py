@@ -21,6 +21,8 @@ def test_parse_scores_extracts_multiple_cpu_results():
         ("Rendering (Multiple CPU) 1234.00 cb in 65.2 seconds", 1234.0),
         ("Rendering (Multiple CPU): 1234 cb (16 CPUs)", 1234.0),
         ("Rendering (Multiple CPU) 1,234 cb", 1234.0),
+        ("Rendering (Multiple CPU) : 4649.00 pts", 4649.0),
+        ("Rendering (Multiple CPU) : 4769.29 pt", 4769.29),
     ],
 )
 def test_parse_scores_uses_the_value_with_the_score_unit(line: str, expected: float):
