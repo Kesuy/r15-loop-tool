@@ -62,7 +62,7 @@ jobs:
         shell: pwsh
         run: |
           $tag = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "dev-$env:GITHUB_RUN_NUMBER" }
-          $asset = "R15循环工具-$tag-windows-x86_64.exe"
+          $asset = "R15-Loop-Tool-$tag-windows-x86_64.exe"
           Move-Item "$PWD\dist\R15循环工具.exe" "$PWD\$asset"
           "name=$asset" >> $env:GITHUB_OUTPUT
 
