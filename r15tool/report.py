@@ -9,7 +9,7 @@ from statistics import mean
 
 _SCORE_LINE = re.compile(r"Rendering\s*\(Multiple CPU\)(.*)", re.IGNORECASE)
 _SCORE_VALUE = re.compile(
-    r"(?<![\d,])((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*cb\b",
+    r"(?<![\d,])((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)\s*(?:cb|pts?)\b",
     re.IGNORECASE,
 )
 
