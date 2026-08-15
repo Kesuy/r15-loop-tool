@@ -43,7 +43,7 @@ jobs:
           $exe = "$PWD\dist\R15循环工具.exe"
           $report = "$PWD\dist\R15benchmark.txt"
           $output = "$PWD\dist\R15曲线图.html"
-          [IO.File]::WriteAllLines($report, $lines, [Text.UTF8Encoding]::new($false))
+          [IO.File]::WriteAllLines($report, $lines, [Text.Encoding]::Unicode)
           Push-Location $env:TEMP
           try {
             "N" | & $exe --no-open
