@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+*.spec
+sample-*.txt
+sample-*.html
+report-*.png
+chromium*.log
+R15benchmark.txt
+R15曲线图.html

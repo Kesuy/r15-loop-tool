@@ -1,0 +1,86 @@
+name: Build and release Windows EXE
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-build.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --require-hashes -r requirements-build.txt
+          python -m pip install --no-deps --no-build-isolation .
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Build EXE
+        run: pyinstaller --noconfirm --clean --onefile --console --name "R15循环工具" --icon icon.ico main.py
+
+      - name: Smoke test packaged EXE
+        shell: pwsh
+        run: |
+          $lines = 1..500 | ForEach-Object { "Rendering (Multiple CPU) $([1200 + ($_ % 41)]).00 cb" }
+          [IO.File]::WriteAllLines("$PWD\R15benchmark.txt", $lines, [Text.UTF8Encoding]::new($false))
+          & "$PWD\dist\R15循环工具.exe" --report "$PWD\R15benchmark.txt" --output "$PWD\R15曲线图.html" --no-open
+          if ($LASTEXITCODE -ne 0) { throw "EXE exited with code $LASTEXITCODE" }
+          $html = [IO.File]::ReadAllText("$PWD\R15曲线图.html", [Text.Encoding]::UTF8)
+          if ($html -notmatch '"type":"slider"' -or $html -notmatch '500 次' -or $html -notmatch 'width: 100%') {
+            throw "Generated HTML did not contain the responsive large-report features"
+          }
+
+      - name: Prepare asset
+        id: asset
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF_TYPE -eq "tag") { $env:GITHUB_REF_NAME } else { "dev-$env:GITHUB_RUN_NUMBER" }
+          $asset = "R15循环工具-$tag-windows-x86_64.exe"
+          Move-Item "$PWD\dist\R15循环工具.exe" "$PWD\$asset"
+          "name=$asset" >> $env:GITHUB_OUTPUT
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: windows-x86_64
+          path: ${{ steps.asset.outputs.name }}
+
+  publish-release:
+    if: github.ref_type == 'tag'
+    needs: test-build-release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified EXE
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: windows-x86_64
+          path: release-assets
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $asset = Get-ChildItem "$PWD\release-assets\*.exe" | Select-Object -First 1
+          if (-not $asset) { throw "Verified EXE artifact is missing" }
+          gh release create "$env:GITHUB_REF_NAME" "$($asset.FullName)" --repo "$env:GITHUB_REPOSITORY" --title "$env:GITHUB_REF_NAME" --generate-notes --latest --verify-tag
