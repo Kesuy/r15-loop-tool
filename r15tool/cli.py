@@ -33,6 +33,26 @@ def _same_file(first: Path, second: Path) -> bool:
         return first.resolve() == second.resolve()
 
 
+def _read_report(report: Path) -> str:
+    """读取 Cinebench 输出，并兼容 Windows 常见的重定向编码。"""
+    data = report.read_bytes()
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")):
+        return data.decode("utf-16", errors="replace")
+    if data.startswith(b"\xef\xbb\xbf"):
+        return data.decode("utf-8-sig", errors="replace")
+    if b"\x00" in data:
+        even_nuls = data[::2].count(0)
+        odd_nuls = data[1::2].count(0)
+        encoding = "utf-16-be" if even_nuls > odd_nuls else "utf-16-le"
+        return data.decode(encoding, errors="replace")
+    for encoding in ("utf-8", "mbcs" if os.name == "nt" else "gb18030"):
+        try:
+            return data.decode(encoding)
+        except (LookupError, UnicodeDecodeError):
+            pass
+    return data.decode("latin-1", errors="replace")
+
+
 def run_benchmark(executable: Path, report: Path, runs: int) -> None:
     if runs < 1:
         raise ValueError("循环次数必须大于 0")
@@ -58,11 +78,13 @@ def run_benchmark(executable: Path, report: Path, runs: int) -> None:
 def generate(report: Path, output: Path, *, open_browser: bool = True) -> Path:
     if _same_file(report, output):
         raise ValueError("跑分报告和 HTML 输出不能是同一个文件")
-    scores = parse_scores(report.read_text(encoding="utf-8", errors="ignore"))
+    scores = parse_scores(_read_report(report))
     result = render_report(scores, output)
+    if not result.is_file():
+        raise OSError(f"HTML 文件生成失败：{result}")
     if open_browser:
         if os.name == "nt":
-            os.startfile(result)  # type: ignore[attr-defined]
+            os.startfile(str(result))  # type: ignore[attr-defined]
         else:
             webbrowser.open(result.as_uri())
     return result
