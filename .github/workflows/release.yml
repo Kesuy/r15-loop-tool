@@ -40,13 +40,22 @@ jobs:
         shell: pwsh
         run: |
           $lines = 1..500 | ForEach-Object { "Rendering (Multiple CPU) $(1200 + ($_ % 41)).00 cb" }
-          [IO.File]::WriteAllLines("$PWD\R15benchmark.txt", $lines, [Text.UTF8Encoding]::new($false))
-          & "$PWD\dist\R15循环工具.exe" --report "$PWD\R15benchmark.txt" --output "$PWD\R15曲线图.html" --no-open
-          if ($LASTEXITCODE -ne 0) { throw "EXE exited with code $LASTEXITCODE" }
-          $html = [IO.File]::ReadAllText("$PWD\R15曲线图.html", [Text.Encoding]::UTF8)
+          $exe = "$PWD\dist\R15循环工具.exe"
+          $report = "$PWD\dist\R15benchmark.txt"
+          $output = "$PWD\dist\R15曲线图.html"
+          [IO.File]::WriteAllLines($report, $lines, [Text.UTF8Encoding]::new($false))
+          Push-Location $env:TEMP
+          try {
+            "N" | & $exe --no-open
+            if ($LASTEXITCODE -ne 0) { throw "EXE exited with code $LASTEXITCODE" }
+          } finally {
+            Pop-Location
+          }
+          $html = [IO.File]::ReadAllText($output, [Text.Encoding]::UTF8)
           if ($html -notmatch '"type":"slider"' -or $html -notmatch '500 次' -or $html -notmatch 'width: 100%') {
             throw "Generated HTML did not contain the responsive large-report features"
           }
+          Remove-Item $report, $output
 
       - name: Prepare asset
         id: asset

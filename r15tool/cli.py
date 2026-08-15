@@ -14,6 +14,12 @@ DEFAULT_OUTPUT = "R15曲线图.html"
 DEFAULT_EXE = "CINEBENCH Windows 64 Bit.exe"
 
 
+def _default_base_directory() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path.cwd()
+
+
 def _configure_text_stream(stream: object) -> None:
     reconfigure = getattr(stream, "reconfigure", None)
     if callable(reconfigure):
@@ -71,14 +77,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cinebench",
         type=Path,
-        default=Path(DEFAULT_EXE),
-        help="Cinebench R15 可执行文件",
+        help=f"Cinebench R15 可执行文件（默认：{DEFAULT_EXE}）",
     )
     mode.add_argument(
         "--report", type=Path, help=f"读取已有跑分文本文件（默认：{DEFAULT_BENCHMARK}）"
     )
     parser.add_argument(
-        "--output", type=Path, default=Path(DEFAULT_OUTPUT), help="输出 HTML 文件"
+        "--output", type=Path, help=f"输出 HTML 文件（默认：{DEFAULT_OUTPUT}）"
     )
     parser.add_argument("--no-open", action="store_true", help="生成后不自动打开浏览器")
     return parser
@@ -111,9 +116,10 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     print("Cinebench R15 循环跑分工具")
     try:
-        report = (args.report or Path(DEFAULT_BENCHMARK)).resolve()
-        output = args.output.resolve()
-        executable = args.cinebench.resolve()
+        default_base = _default_base_directory()
+        report = (args.report or default_base / DEFAULT_BENCHMARK).resolve()
+        output = (args.output or default_base / DEFAULT_OUTPUT).resolve()
+        executable = (args.cinebench or default_base / DEFAULT_EXE).resolve()
         runs = (
             args.runs
             if args.runs is not None or args.report is not None

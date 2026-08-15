@@ -41,6 +41,33 @@ def test_explicit_report_generates_without_interactive_prompt(
     assert output.is_file()
 
 
+def test_packaged_app_generates_and_opens_report_next_to_executable(
+    tmp_path: Path, monkeypatch
+):
+    app_dir = tmp_path / "cinebench"
+    app_dir.mkdir()
+    executable = app_dir / "CINEBENCH Windows 64 Bit.exe"
+    executable.touch()
+    launch_dir = tmp_path / "unrelated-working-directory"
+    launch_dir.mkdir()
+    opened = []
+
+    def fake_run(*_args, **kwargs):
+        kwargs["stdout"].write(b"Rendering (Multiple CPU) 1234.00 cb\n")
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.chdir(launch_dir)
+    monkeypatch.setattr("r15tool.cli.sys.frozen", True, raising=False)
+    monkeypatch.setattr("r15tool.cli.sys.executable", str(app_dir / "R15-loop.exe"))
+    monkeypatch.setattr("r15tool.cli.subprocess.run", fake_run)
+    monkeypatch.setattr("r15tool.cli.webbrowser.open", lambda uri: opened.append(uri))
+
+    assert main(["--runs", "1"]) == 0
+    output = app_dir / "R15曲线图.html"
+    assert output.is_file()
+    assert opened == [output.resolve().as_uri()]
+
+
 def test_runs_and_existing_report_are_mutually_exclusive():
     with pytest.raises(SystemExit):
         build_parser().parse_args(["--runs", "2", "--report", "existing.txt"])
