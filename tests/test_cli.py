@@ -76,6 +76,45 @@ def test_packaged_app_generates_and_opens_report_next_to_executable(
     assert opened == [expected_opened]
 
 
+@pytest.mark.parametrize(
+    "encoding",
+    ["utf-8", "utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "gb18030"],
+)
+def test_generate_reads_windows_report_encodings(tmp_path: Path, encoding: str):
+    report = tmp_path / "R15benchmark.txt"
+    output = tmp_path / "R15曲线图.html"
+    report.write_bytes("Rendering (Multiple CPU) 1234.00 cb\r\n".encode(encoding))
+
+    result = generate(report, output, open_browser=False)
+
+    assert result == output.resolve()
+    assert output.is_file()
+    assert "1,234 cb" in output.read_text(encoding="utf-8")
+
+
+def test_generate_opens_only_after_html_exists(tmp_path: Path, monkeypatch):
+    report = tmp_path / "R15benchmark.txt"
+    output = tmp_path / "R15曲线图.html"
+    report.write_text("Rendering (Multiple CPU) 1234 cb\n", encoding="utf-8")
+    opened = []
+
+    if os.name == "nt":
+        monkeypatch.setattr(
+            "r15tool.cli.os.startfile",
+            lambda path: opened.append((Path(path), output.is_file())),
+            raising=False,
+        )
+    else:
+        monkeypatch.setattr(
+            "r15tool.cli.webbrowser.open",
+            lambda uri: opened.append((uri, output.is_file())),
+        )
+
+    generate(report, output)
+
+    assert opened and opened[0][1] is True
+
+
 def test_runs_and_existing_report_are_mutually_exclusive():
     with pytest.raises(SystemExit):
         build_parser().parse_args(["--runs", "2", "--report", "existing.txt"])
